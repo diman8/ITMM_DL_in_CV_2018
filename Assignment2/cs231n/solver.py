@@ -1,8 +1,5 @@
 from __future__ import print_function, division
-# standard_library.install_aliases нужен только для обратной совместимости с python2
-# from future import standard_library
-# standard_library.install_aliases()
-from builtins import range
+standard_library.install_aliases()from builtins import range
 from builtins import object
 import os
 import pickle as pickle
