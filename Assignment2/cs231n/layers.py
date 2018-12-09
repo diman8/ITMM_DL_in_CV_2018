@@ -445,12 +445,57 @@ def conv_forward_naive(x, w, b, conv_param):
       W' = 1 + (W + 2 * pad - WW) / stride
     - cache: (x, w, b, conv_param)
     """
-    out = None
+    out = None # (N, F, H', W')
     ###########################################################################
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    pass
+    # input = x
+    stride = conv_param['stride']
+    pad = conv_param['pad']
+    N, C, H, W = x.shape
+    F, _, HH, WW = w.shape
+    
+    Ho = int(1 + (H + 2 * pad - HH) / stride)
+    Wo = int(1 + (W + 2 * pad - WW) / stride)
+    out = np.zeros((N, F, Ho, Wo))
+    
+    # for n in range(N):
+    #     temp = x[n]
+    #     temp = np.pad(temp, ((0,0),(pad,pad),(pad,pad)), 'constant')
+    #     _, H, W = temp.shape
+    #     for sh in range(0, H-stride, stride):
+    #         for sw in range(0, W-stride, stride):
+    #             for f in range(F):
+    #                 # get (HH,WW) window of x
+    #                 filter = w[f]
+    #                 window = temp[:,sh:sh+HH,sw:sw+WW]
+    #                 print('filer:', filter)
+    #                 print('window:', window)
+    #                 out1 = np.multiply(window, filter)
+    #                 print('o1:', out1)
+    #                 out2 = np.sum(out1)
+    #                 print('o2:', out2)
+    #                 out[n][f] = out2 + b[f]
+    #                 print('o3:', out[n][f])
+    
+    for n in range(N):
+        temp = x[n]
+        temp = np.pad(temp, ((0,0),(pad,pad),(pad,pad)), 'constant')
+        _, H, W = temp.shape
+        for sh in range(Ho):
+            for sw in range(Wo):
+                for f in range(F):
+                    # get (HH,WW) window of x
+                    filter = w[f]
+                    window = temp[:,sh*stride:(sh*stride)+HH,sw*stride:(sw*stride)+WW]
+                    # print('filer:', filter)
+                    # print('window:', window)
+                    out[n][f][sh][sw] = np.sum(np.multiply(window, filter)) + b[f]
+    
+    
+    # np.pad(a,(1,1),'constant',constant_values=(0,0))
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
