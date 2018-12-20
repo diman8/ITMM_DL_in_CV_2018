@@ -190,7 +190,39 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Referencing the original paper (https://arxiv.org/abs/1502.03167)   #
         # might prove to be helpful.                                          #
         #######################################################################
-        pass
+        # Forward pass
+        # 1 mu (D,) - mean of a minibatch
+        mu = 1 / float(N) * np.sum(x, axis=0)
+
+        # 2 xmu (N,D) - x without shift
+        xmu = x - mu
+
+        # 3 carre (N,D)
+        carre = xmu**2
+
+        # 4 var (D,) - variance of minibatch
+        var = 1 / float(N) * np.sum(carre, axis=0)
+
+        # 5 sqrtvar (D,)
+        sqrtvar = np.sqrt(var + eps)
+
+        # 6 invvar (D,)
+        invvar = 1. / sqrtvar
+
+        # 7 va2 (N,D) - normalized x
+        va2 = xmu * invvar
+
+        # 8 va3 (N,D)
+        va3 = gamma * va2
+
+        # 9 out (N,D) - final scale&shift
+        out = va3 + beta
+
+        running_mean = momentum * running_mean + (1.0 - momentum) * mu
+        running_var = momentum * running_var + (1.0 - momentum) * var
+
+        cache = (mu, xmu, carre, var, sqrtvar, invvar,
+                 va2, va3, gamma, beta, x, bn_param)
         #######################################################################
         #                           END OF YOUR CODE                          #
         #######################################################################
@@ -201,7 +233,11 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # then scale and shift the normalized data using gamma and beta.      #
         # Store the result in the out variable.                               #
         #######################################################################
-        pass
+        mu = running_mean
+        var = running_var
+        xhat = (x - mu) / np.sqrt(var + eps)
+        out = gamma * xhat + beta
+        cache = (mu, var, gamma, beta, bn_param)
         #######################################################################
         #                          END OF YOUR CODE                           #
         #######################################################################
@@ -239,7 +275,40 @@ def batchnorm_backward(dout, cache):
     # Referencing the original paper (https://arxiv.org/abs/1502.03167)       #
     # might prove to be helpful.                                              #
     ###########################################################################
-    pass
+    mu, xmu, carre, var, sqrtvar, invvar, va2, va3, gamma, beta, x, bn_param = cache
+    eps = bn_param.get('eps', 1e-5)
+    N, D = dout.shape
+    
+    # Backprop Step 9
+    dva3 = dout
+    dbeta = np.sum(dout, axis=0)
+
+    # Backprop step 8
+    dva2 = gamma * dva3
+    dgamma = np.sum(va2 * dva3, axis=0)
+
+    # Backprop step 7
+    dxmu = invvar * dva2
+    dinvvar = np.sum(xmu * dva2, axis=0)
+
+    # Backprop step 6
+    dsqrtvar = (-1. / (sqrtvar**2)) * dinvvar
+
+    # Backprop step 5
+    dvar = 0.5 * (var + eps)**(-0.5) * dsqrtvar
+
+    # Backprop step 4
+    dcarre = 1 / float(N) * np.ones((carre.shape)) * dvar
+
+    # Backprop step 3
+    dxmu += 2 * xmu * dcarre
+
+    # Backprop step 2
+    dx = dxmu
+    dmu = - np.sum(dxmu, axis=0)
+
+    # Basckprop step 1
+    dx += 1 / float(N) * np.ones((dxmu.shape)) * dmu
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -270,7 +339,14 @@ def batchnorm_backward_alt(dout, cache):
     # should be able to compute gradients with respect to the inputs in a     #
     # single statement; our implementation fits on a single 80-character line.#
     ###########################################################################
-    pass
+    mu, xmu, carre, var, sqrtvar, invvar, va2, va3, gamma, beta, x, bn_param = cache
+    eps = bn_param.get('eps', 1e-5)
+    N, D = dout.shape
+
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum((x - mu) * (var + eps)**(-1. / 2.) * dout, axis=0)
+    dx = (1. / N) * gamma * (var + eps)**(-1. / 2.) * (N * dout - np.sum(dout, axis=0)
+                                                       - (x - mu) * (var + eps)**(-1.0) * np.sum(dout * (x - mu), axis=0))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -312,7 +388,37 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # transformations you could perform, that would enable you to copy over   #
     # the batch norm code and leave it almost unchanged?                      #
     ###########################################################################
-    pass
+    N, D = x.shape
+    
+    # 1 mu (D,) - mean of a minibatch
+    mu = 1 / float(N) * np.sum(x, axis=0)
+
+    # 2 xmu (N,D) - x without shift
+    xmu = x - mu
+
+    # 3 carre (N,D)
+    carre = xmu**2
+
+    # 4 var (D,) - variance of minibatch
+    var = 1 / float(N) * np.sum(carre, axis=0)
+
+    # 5 sqrtvar (D,)
+    sqrtvar = np.sqrt(var + eps)
+
+    # 6 invvar (D,)
+    invvar = 1. / sqrtvar
+
+    # 7 va2 (N,D) - normalized x
+    va2 = xmu * invvar
+
+    # 8 va3 (N,D)
+    va3 = gamma * va2
+
+    # 9 out (N,D) - final scale&shift
+    out = va3 + beta
+
+    cache = (mu, xmu, carre, var, sqrtvar, invvar,
+             va2, va3, gamma, beta, x, ln_param)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -343,7 +449,40 @@ def layernorm_backward(dout, cache):
     # implementation of batch normalization. The hints to the forward pass    #
     # still apply!                                                            #
     ###########################################################################
-    pass
+    mu, xmu, carre, var, sqrtvar, invvar, va2, va3, gamma, beta, x, bn_param = cache
+    eps = bn_param.get('eps', 1e-5)
+    N, D = dout.shape
+    
+    # Backprop Step 9
+    dva3 = dout
+    dbeta = np.sum(dout, axis=0)
+
+    # Backprop step 8
+    dva2 = gamma * dva3
+    dgamma = np.sum(va2 * dva3, axis=0)
+
+    # Backprop step 7
+    dxmu = invvar * dva2
+    dinvvar = np.sum(xmu * dva2, axis=0)
+
+    # Backprop step 6
+    dsqrtvar = (-1. / (sqrtvar**2)) * dinvvar
+
+    # Backprop step 5
+    dvar = 0.5 * (var + eps)**(-0.5) * dsqrtvar
+
+    # Backprop step 4
+    dcarre = 1 / float(N) * np.ones((carre.shape)) * dvar
+
+    # Backprop step 3
+    dxmu += 2 * xmu * dcarre
+
+    # Backprop step 2
+    dx = dxmu
+    dmu = - np.sum(dxmu, axis=0)
+
+    # Basckprop step 1
+    dx += 1 / float(N) * np.ones((dxmu.shape)) * dmu
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
